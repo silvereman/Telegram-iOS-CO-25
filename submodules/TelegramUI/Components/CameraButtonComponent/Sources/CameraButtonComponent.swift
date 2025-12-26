@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import ComponentFlow
+import Display
 
 public final class CameraButton: Component {
     let content: AnyComponentWithIdentity<Empty>
@@ -68,22 +69,83 @@ public final class CameraButton: Component {
         private var currentIsHighlighted: Bool = false {
             didSet {
                 if self.currentIsHighlighted != oldValue {
-                    self.updateScale(transition: .easeInOut(duration: 0.3))
+                    self.updateScaleWithLiquidGlass()
                 }
             }
         }
         
-        private func updateScale(transition: ComponentTransition) {
+        private var isPulsing: Bool = false
+        
+        private func updateScaleWithLiquidGlass() {
             guard let component = self.component else {
                 return
             }
-            let scale: CGFloat
-            if component.isEnabled {
-                scale = self.currentIsHighlighted ? 0.8 : 1.0
-            } else {
-                scale = 1.0
+            
+            if !component.isEnabled {
+                return
             }
-            transition.setScale(view: self.containerView, scale: scale)
+            
+            // Liquid glass animations for camera button
+            if self.currentIsHighlighted {
+                // Press animation: scale to unified press scale with elastic bounce-back
+                LiquidGlassAnimations.pressDownScale(
+                    layer: self.containerView.layer,
+                    to: LiquidGlassAnimationParameters.scalePress,
+                    parameters: .pressDown
+                )
+            } else {
+                // Release animation: bounce back to 1.0 with spring
+                LiquidGlassAnimations.bounceReleaseScale(
+                    layer: self.containerView.layer,
+                    to: LiquidGlassAnimationParameters.scaleNormal,
+                    parameters: .bounceRelease
+                )
+            }
+        }
+        
+        // Add the missing updateScale method called from update()
+        private func updateScale(transition: ComponentTransition) {
+            // Apply current scale based on highlight state without animation
+            guard let component = self.component else {
+                return
+            }
+            
+            if !component.isEnabled {
+                return
+            }
+            
+            // Update scale immediately for initial state
+            let targetScale: CGFloat = self.currentIsHighlighted ? LiquidGlassAnimationParameters.scalePress : LiquidGlassAnimationParameters.scaleNormal
+            self.containerView.layer.transform = CATransform3DMakeScale(targetScale, targetScale, 1.0)
+        }
+        
+        // Start pulsing animation during recording
+        public func startPulsing() {
+            guard !isPulsing else { return }
+            isPulsing = true
+            
+            LiquidGlassAnimations.pulsingScale(
+                layer: self.containerView.layer,
+                fromScale: 1.0,
+                toScale: 1.05,
+                duration: 1.0,
+                autoreverses: true
+            )
+        }
+        
+        // Stop pulsing animation
+        public func stopPulsing() {
+            guard isPulsing else { return }
+            isPulsing = false
+            
+            LiquidGlassAnimations.stopPulsing(layer: self.containerView.layer)
+            
+            // Return to normal scale
+            LiquidGlassAnimations.bounceReleaseScale(
+                layer: self.containerView.layer,
+                to: 1.0,
+                parameters: .bounceRelease
+            )
         }
         
         private var longTapGestureRecognizer: UILongPressGestureRecognizer?

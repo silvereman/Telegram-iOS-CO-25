@@ -24,6 +24,8 @@ import LegacyMessageInputPanelInputView
 import ReactionSelectionNode
 import TopMessageReactions
 import GlassBackgroundComponent
+import LiquidGlassAnimations
+import LiquidGlassBlurProvider
 
 private let legacyButtonSize = CGSize(width: 88.0, height: 49.0)
 private let glassButtonSize = CGSize(width: 72.0, height: 62.0)
@@ -347,6 +349,39 @@ private final class AttachButtonComponent: CombinedComponent {
             context.add(button
                 .position(CGPoint(x: context.availableSize.width / 2.0, y: context.availableSize.height / 2.0))
                 .gesture(.tap {
+                    // Liquid glass tap animation for glass style
+                    if case .glass = component.style, let view = button.view {
+                        // Highlight animation: scale 1.0 → 1.12 → 1.0 with spring
+                        LiquidGlassAnimations.highlightScale(
+                            layer: view.layer,
+                            from: 1.0,
+                            to: 1.12,
+                            parameters: .highlightTap
+                        ) {
+                            // Return to normal after highlight
+                            LiquidGlassAnimations.bounceReleaseScale(
+                                layer: view.layer,
+                                to: 1.0,
+                                parameters: .bounceRelease
+                            )
+                        }
+                        
+                        // Add stretch effect (scaleX: 1.03, scaleY: 0.97)
+                        LiquidGlassAnimations.stretchScale(
+                            layer: view.layer,
+                            scaleX: 1.03,
+                            scaleY: 0.97,
+                            parameters: .pressDown
+                        ) {
+                            // Return to normal
+                            LiquidGlassAnimations.stretchScale(
+                                layer: view.layer,
+                                scaleX: 1.0,
+                                scaleY: 1.0,
+                                parameters: .bounceRelease
+                            )
+                        }
+                    }
                     component.action()
                 })
                 .gesture(.longPress({ state in

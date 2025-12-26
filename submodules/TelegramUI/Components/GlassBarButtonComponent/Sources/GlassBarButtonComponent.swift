@@ -4,6 +4,8 @@ import AsyncDisplayKit
 import Display
 import ComponentFlow
 import GlassBackgroundComponent
+import LiquidGlassAnimations
+import LiquidGlassBlurProvider
 
 public final class GlassBarButtonComponent: Component {
     public enum DisplayState: Equatable {
@@ -88,14 +90,50 @@ public final class GlassBarButtonComponent: Component {
                         
             self.addTarget(self, action: #selector(self.pressed), for: .touchUpInside)
             
+            // Enhanced liquid glass animations
             self.highligthedChanged = { [weak self] highlighted in
                 guard let self else {
                     return
                 }
+                
                 if highlighted {
-                    self.containerView.layer.animateSpring(from: CGFloat((self.containerView.layer.presentation()?.value(forKeyPath: "transform.scale.y") as? NSNumber)?.floatValue ?? 1.0) as NSNumber, to: 1.3636 as NSNumber, keyPath: "transform.scale", duration: 0.5, removeOnCompletion: false)
+                    // Press down animation: scale to 0.95 with stretch effect
+                    LiquidGlassAnimations.pressDownScale(
+                        layer: self.containerView.layer,
+                        to: 0.95,
+                        parameters: .pressDown
+                    )
                 } else {
-                    self.containerView.layer.animateSpring(from: CGFloat((self.containerView.layer.presentation()?.value(forKeyPath: "transform.scale.y") as? NSNumber)?.floatValue ?? 1.3636) as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: 0.6)
+                    // Release sequence: bounce → highlight → wobble
+                    LiquidGlassAnimations.bounceReleaseScale(
+                        layer: self.containerView.layer,
+                        to: 1.0,
+                        parameters: .bounceRelease
+                    ) { [weak self] in
+                        guard let self else { return }
+                        
+                        // Highlight animation: scale 1.0 → 1.15 → 1.0
+                        LiquidGlassAnimations.highlightScale(
+                            layer: self.containerView.layer,
+                            from: 1.0,
+                            to: 1.15,
+                            parameters: .highlightTap
+                        ) { [weak self] in
+                            guard let self else { return }
+                            LiquidGlassAnimations.bounceReleaseScale(
+                                layer: self.containerView.layer,
+                                to: 1.0,
+                                parameters: .bounceRelease
+                            )
+                        }
+                        
+                        // Add subtle rotation wobble (±2 degrees)
+                        LiquidGlassAnimations.rotationWobble(
+                            layer: self.containerView.layer,
+                            angle: 2.0 * .pi / 180.0,
+                            parameters: .bounceRelease
+                        )
+                    }
                 }
             }
         }

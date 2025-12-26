@@ -18,6 +18,8 @@ import AnimatedCountLabelNode
 import GlassBackgroundComponent
 import ComponentDisplayAdapters
 import StarsParticleEffect
+import LiquidGlassAnimations
+import LiquidGlassBlurProvider
 
 private final class EffectBadgeView: UIView {
     private let context: AccountContext
@@ -249,11 +251,29 @@ public final class ChatTextInputActionButtonsNode: ASDisplayNode, ChatSendMessag
                 return
             }
             if highlighted {
-                self.expandMediaInputButton.layer.animateScale(from: 1.0, to: 0.75, duration: 0.4, removeOnCompletion: false)
-            } else if let presentationLayer = self.expandMediaInputButton.layer.presentation() {
-                self.expandMediaInputButton.layer.animateScale(from: CGFloat((presentationLayer.value(forKeyPath: "transform.scale.y") as? NSNumber)?.floatValue ?? 1.0), to: 1.0, duration: 0.25, removeOnCompletion: false)
+            // Liquid glass highlight animation (scale up)
+            LiquidGlassAnimations.highlightScale(
+                layer: self.expandMediaInputButton.layer,
+                to: 1.1,
+                parameters: .highlightTap
+            )
+        } else {
+            // Liquid glass release animation with stretch
+            LiquidGlassAnimations.stretchScale(
+                layer: self.expandMediaInputButton.layer,
+                scaleX: 1.05,
+                scaleY: 0.95,
+                parameters: .stretch
+            ) { [weak self] in
+                guard let self else { return }
+                LiquidGlassAnimations.bounceReleaseScale(
+                    layer: self.expandMediaInputButton.layer,
+                    to: 1.0,
+                    parameters: .bounceRelease
+                )
             }
         }
+    }
     }
     
     override public func didLoad() {

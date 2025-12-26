@@ -4,6 +4,8 @@ import Display
 import AsyncDisplayKit
 import ComponentFlow
 import TelegramPresentationData
+import LiquidGlassAnimations
+import LiquidGlassBlurProvider
 
 public final class SwitchComponent: Component {
     public typealias EnvironmentType = Empty
@@ -33,38 +35,38 @@ public final class SwitchComponent: Component {
     }
     
     public final class View: UIView {
-        private let switchView: UISwitch
+        private let switchNode: LiquidGlassSwitchNode
     
         private var component: SwitchComponent?
         
         override init(frame: CGRect) {
-            self.switchView = UISwitch()
+            self.switchNode = LiquidGlassSwitchNode()
             
             super.init(frame: frame)
             
-            self.addSubview(self.switchView)
+            self.addSubnode(self.switchNode)
             
-            self.switchView.addTarget(self, action: #selector(self.valueChanged(_:)), for: .valueChanged)
+            self.switchNode.valueChanged = { [weak self] value in
+                self?.component?.valueUpdated(value)
+            }
         }
         
         required init?(coder: NSCoder) {
             fatalError("init(coder:) has not been implemented")
         }
         
-        @objc func valueChanged(_ sender: Any) {
-            self.component?.valueUpdated(self.switchView.isOn)
-        }
-        
         func update(component: SwitchComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<EnvironmentType>, transition: ComponentTransition) -> CGSize {
             self.component = component
           
-            self.switchView.tintColor = component.tintColor
-            self.switchView.setOn(component.value, animated: !transition.animation.isImmediate)
+            if let tintColor = component.tintColor {
+                self.switchNode.onTintColor = tintColor
+            }
+            self.switchNode.setOn(component.value, animated: !transition.animation.isImmediate)
             
-            self.switchView.sizeToFit()
-            self.switchView.frame = CGRect(origin: .zero, size: self.switchView.frame.size)
+            let switchSize = self.switchNode.calculateSizeThatFits(availableSize)
+            self.switchNode.frame = CGRect(origin: .zero, size: switchSize)
                         
-            return self.switchView.frame.size
+            return switchSize
         }
     }
 

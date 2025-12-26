@@ -780,11 +780,19 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
         self.menuButton.highligthedChanged = { [weak self] highlighted in
             if let strongSelf = self {
                 if highlighted {
-                    let transition: ContainedViewLayoutTransition = .animated(duration: 0.3, curve: .spring)
-                    transition.updateTransformScale(node: strongSelf.menuButton, scale: 0.85)
+                    // Use Liquid Glass press-down animation for glass button effect
+                    LiquidGlassAnimations.pressDownScale(
+                        layer: strongSelf.menuButton.layer,
+                        to: 0.88,
+                        parameters: .pressDown
+                    )
                 } else {
-                    let transition: ContainedViewLayoutTransition = .animated(duration: 0.5, curve: .spring)
-                    transition.updateTransformScale(node: strongSelf.menuButton, scale: 1.0)
+                    // Use Liquid Glass bounce-release animation
+                    LiquidGlassAnimations.bounceReleaseScale(
+                        layer: strongSelf.menuButton.layer,
+                        to: 1.0,
+                        parameters: .bounceRelease
+                    )
                 }
             }
         }
@@ -809,10 +817,22 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
         self.attachmentButton.highligthedChanged = { [weak self] highlighted in
             if let self {
                 if highlighted {
+                    // Use Liquid Glass press-down animation
+                    LiquidGlassAnimations.pressDownScale(
+                        layer: self.attachmentButtonBackground.layer,
+                        to: 0.88,
+                        parameters: .pressDown
+                    )
                     self.attachmentButtonIcon.layer.removeAnimation(forKey: "opacity")
                     self.attachmentButtonIcon.alpha = 0.4
                     self.attachmentButtonIcon.layer.allowsGroupOpacity = true
                 } else {
+                    // Use Liquid Glass bounce-release animation
+                    LiquidGlassAnimations.bounceReleaseScale(
+                        layer: self.attachmentButtonBackground.layer,
+                        to: 1.0,
+                        parameters: .bounceRelease
+                    )
                     self.attachmentButtonIcon.alpha = 1.0
                     self.attachmentButtonIcon.layer.animateAlpha(from: 0.4, to: 1.0, duration: 0.2)
                     self.attachmentButtonIcon.layer.allowsGroupOpacity = false

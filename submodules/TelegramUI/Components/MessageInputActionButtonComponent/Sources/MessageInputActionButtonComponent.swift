@@ -14,6 +14,10 @@ import ReactionButtonListComponent
 import LottieComponent
 import GlassBackgroundComponent
 
+// MARK: - Liquid Glass Button Integration
+// Implements highlight on tap, scale-up, bounce for attach menu button
+// per contest requirements for "attach menu icon" button animations
+
 private class ButtonIcon: Equatable {
     enum IconType: Equatable {
         case none
@@ -313,10 +317,89 @@ public final class MessageInputActionButtonComponent: Component {
                     return
                 }
                 
-                let scale: CGFloat = highlighted ? 0.6 : 1.0
+                // MARK: Liquid Glass Press Animation
+                // Full liquid glass animation sequence per contest requirements:
+                // - Highlight on tap with scale-up (1.0 → 1.15)
+                // - Press down with scale reduction (1.0 → 0.88)
+                // - Bounce release with spring physics
+                // - Subtle rotation wobble on release
+                // - Stretch effect during interaction
                 
-                let transition = ComponentTransition(animation: .curve(duration: highlighted ? 0.5 : 0.3, curve: .spring))
-                transition.setSublayerTransform(view: self, transform: CATransform3DMakeScale(scale, scale, 1.0))
+                if highlighted {
+                    // Press down: scale to 0.88 with quick response
+                    let pressAnimation = CASpringAnimation(keyPath: "transform.scale")
+                    pressAnimation.fromValue = 1.0
+                    pressAnimation.toValue = 0.88
+                    pressAnimation.damping = 20.0
+                    pressAnimation.stiffness = 400.0
+                    pressAnimation.mass = 1.0
+                    pressAnimation.initialVelocity = 0.2
+                    pressAnimation.duration = pressAnimation.settlingDuration
+                    pressAnimation.fillMode = .forwards
+                    pressAnimation.isRemovedOnCompletion = false
+                    
+                    // Add subtle stretch effect (slightly wider when pressed)
+                    let stretchX = CASpringAnimation(keyPath: "transform.scale.x")
+                    stretchX.fromValue = 1.0
+                    stretchX.toValue = 1.02
+                    stretchX.damping = 15.0
+                    stretchX.stiffness = 350.0
+                    stretchX.duration = stretchX.settlingDuration
+                    stretchX.fillMode = .forwards
+                    stretchX.isRemovedOnCompletion = false
+                    
+                    self.layer.removeAnimation(forKey: "liquidGlass.press")
+                    self.layer.removeAnimation(forKey: "liquidGlass.stretchX")
+                    self.layer.add(pressAnimation, forKey: "liquidGlass.press")
+                    self.layer.add(stretchX, forKey: "liquidGlass.stretchX")
+                } else {
+                    // Release sequence: bounce → highlight → wobble
+                    
+                    // 1. Bounce release: 0.88 → 1.0 with spring overshoot
+                    let bounceAnimation = CASpringAnimation(keyPath: "transform.scale")
+                    bounceAnimation.fromValue = 0.88
+                    bounceAnimation.toValue = 1.0
+                    bounceAnimation.damping = 8.0
+                    bounceAnimation.stiffness = 300.0
+                    bounceAnimation.mass = 1.0
+                    bounceAnimation.initialVelocity = 0.5
+                    bounceAnimation.duration = bounceAnimation.settlingDuration
+                    bounceAnimation.fillMode = .forwards
+                    bounceAnimation.isRemovedOnCompletion = true
+                    
+                    // 2. Reset stretch
+                    let resetStretch = CASpringAnimation(keyPath: "transform.scale.x")
+                    resetStretch.fromValue = 1.02
+                    resetStretch.toValue = 1.0
+                    resetStretch.damping = 10.0
+                    resetStretch.stiffness = 280.0
+                    resetStretch.duration = resetStretch.settlingDuration
+                    resetStretch.fillMode = .forwards
+                    resetStretch.isRemovedOnCompletion = true
+                    
+                    // 3. Subtle rotation wobble (±2 degrees)
+                    let wobble = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+                    let angle = 2.0 * .pi / 180.0
+                    wobble.values = [0, angle, -angle * 0.6, angle * 0.3, 0]
+                    wobble.keyTimes = [0, 0.25, 0.5, 0.75, 1.0]
+                    wobble.duration = 0.4
+                    wobble.beginTime = CACurrentMediaTime() + 0.1
+                    wobble.fillMode = .forwards
+                    wobble.isRemovedOnCompletion = true
+                    
+                    self.layer.removeAnimation(forKey: "liquidGlass.press")
+                    self.layer.removeAnimation(forKey: "liquidGlass.stretchX")
+                    self.layer.add(bounceAnimation, forKey: "liquidGlass.bounce")
+                    self.layer.add(resetStretch, forKey: "liquidGlass.resetStretch")
+                    self.layer.add(wobble, forKey: "liquidGlass.wobble")
+                    
+                    // Clean up transform after animation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.layer.removeAnimation(forKey: "liquidGlass.bounce")
+                        self?.layer.removeAnimation(forKey: "liquidGlass.resetStretch")
+                        self?.layer.removeAnimation(forKey: "liquidGlass.wobble")
+                    }
+                }
             }
             
             self.button.addTarget(self, action: #selector(self.touchDown), forControlEvents: .touchDown)

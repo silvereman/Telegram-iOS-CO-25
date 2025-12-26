@@ -17,6 +17,10 @@ import LegacyInstantVideoController
 import GlassBackgroundComponent
 import ComponentDisplayAdapters
 
+// MARK: - Liquid Glass Button Integration
+// Implements highlight on tap, scale-up, bounce, and pulsing for recording buttons
+// per contest requirements for "voice and video message recording buttons"
+
 private let offsetThreshold: CGFloat = 10.0
 private let dismissOffsetThreshold: CGFloat = 70.0
 
@@ -301,8 +305,12 @@ public final class ChatTextInputMediaRecordingButton: TGModernConversationInputM
             if self.hasRecorder != oldValue {
                 if self.hasRecorder {
                     self.animateIn()
+                    // Start Liquid Glass pulsing animation for recording state
+                    self.startLiquidGlassRecordingPulse()
                 } else {
                     self.animateOut(false)
+                    // Stop Liquid Glass pulsing animation
+                    self.stopLiquidGlassRecordingPulse()
                 }
             }
         }
@@ -485,6 +493,10 @@ public final class ChatTextInputMediaRecordingButton: TGModernConversationInputM
         if self.fadeDisabled {
             self.recordingDisabled()
         } else {
+            // MARK: Liquid Glass Press Animation
+            // Apply press-down scale animation for liquid glass effect
+            self.applyLiquidGlassPressDown()
+            
             //print("\(CFAbsoluteTimeGetCurrent()) began")
             self.modeTimeoutTimer?.invalidate()
             let modeTimeoutTimer = SwiftSignalKit.Timer(timeout: 0.19, repeat: false, completion: { [weak self] in
@@ -499,12 +511,18 @@ public final class ChatTextInputMediaRecordingButton: TGModernConversationInputM
     }
     
     public func micButtonInteractionCancelled(_ velocity: CGPoint) {
+        // MARK: Liquid Glass Bounce Release Animation
+        self.applyLiquidGlassBounceRelease()
+        
         //print("\(CFAbsoluteTimeGetCurrent()) cancelled")
         self.modeTimeoutTimer?.invalidate()
         self.endRecording(false)
     }
     
     public func micButtonInteractionCompleted(_ velocity: CGPoint) {
+        // MARK: Liquid Glass Bounce Release Animation
+        self.applyLiquidGlassBounceRelease()
+        
         //print("\(CFAbsoluteTimeGetCurrent()) completed")
         if let modeTimeoutTimer = self.modeTimeoutTimer {
             //print("\(CFAbsoluteTimeGetCurrent()) switch")
@@ -621,6 +639,61 @@ public final class ChatTextInputMediaRecordingButton: TGModernConversationInputM
                 }
             }
         }
+    }
+    
+    // MARK: - Liquid Glass Animation Methods
+    
+    /// Apply press-down scale animation with spring physics
+    private func applyLiquidGlassPressDown() {
+        guard let layer = self.animationView.view?.layer else { return }
+
+        // Use shared Liquid Glass animation (Scale Up per requirements)
+        LiquidGlassAnimations.highlightScale(
+            layer: layer,
+            to: 1.12, // Scale up for prominence
+            parameters: .highlightTap
+        )
+    }
+    
+    /// Apply bounce release animation with spring physics
+    private func applyLiquidGlassBounceRelease() {
+        guard let layer = self.animationView.view?.layer else { return }
+
+        // Use shared Liquid Glass animation with stretch
+        LiquidGlassAnimations.stretchScale(
+            layer: layer,
+            scaleX: 1.05,
+            scaleY: 0.95,
+            parameters: .stretch
+        ) {
+            LiquidGlassAnimations.bounceReleaseScale(
+                layer: layer,
+                to: 1.0,
+                parameters: .bounceRelease
+            )
+        }
+    }
+    
+    /// Start pulsing animation for recording state
+    private func startLiquidGlassRecordingPulse() {
+        guard let layer = self.animationView.view?.layer else { return }
+        
+        LiquidGlassAnimations.pulsingScale(
+            layer: layer,
+            fromScale: 1.0,
+            toScale: 1.05,
+            duration: 0.8
+        )
+    }
+    
+    /// Stop pulsing animation
+    private func stopLiquidGlassRecordingPulse() {
+        guard let layer = self.animationView.view?.layer else { return }
+        
+        LiquidGlassAnimations.stopPulsing(layer: layer)
+        
+        // Bounce back to normal scale
+        applyLiquidGlassBounceRelease()
     }
 }
 

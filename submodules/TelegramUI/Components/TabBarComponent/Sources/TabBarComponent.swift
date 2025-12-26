@@ -11,6 +11,11 @@ import UIKitRuntimeUtils
 import BundleIconComponent
 import TextBadgeComponent
 
+// MARK: - Liquid Glass Tab Bar Integration
+// Integrates LiquidGlassAnimations for tab switch effects while omitting background blur
+// per contest requirements: "Omit background blur behind the bar itself, while preserving
+// the glass lenses' ability to blur the bar's own content."
+
 public final class TabBarComponent: Component {
     public final class Item: Equatable {
         public let item: UITabBarItem
@@ -76,7 +81,8 @@ public final class TabBarComponent: Component {
     
     public final class View: UIView, UITabBarDelegate, UIGestureRecognizerDelegate {
         private let backgroundView: GlassBackgroundView
-        private let selectionView: GlassBackgroundView.ContentImageView
+        private let backgroundView: GlassBackgroundView
+        private let selectionView: GlassBackgroundView
         private let contextGestureContainerView: ContextControllerSourceView
         private let nativeTabBar: UITabBar?
         
@@ -90,7 +96,7 @@ public final class TabBarComponent: Component {
         
         public override init(frame: CGRect) {
             self.backgroundView = GlassBackgroundView()
-            self.selectionView = GlassBackgroundView.ContentImageView()
+            self.selectionView = GlassBackgroundView()
             
             self.contextGestureContainerView = ContextControllerSourceView()
             self.contextGestureContainerView.isGestureEnabled = true
@@ -356,6 +362,51 @@ public final class TabBarComponent: Component {
             self.state?.updated()
         }
         
+        // MARK: - Liquid Glass Tab Selection Animation
+        
+        /// Animates tab selection with liquid glass spring effects
+        /// Implements highlight-on-tap, scale-up, and bounce per contest requirements
+        private func animateTabSelection(
+            itemView: UIView,
+            selectedItemView: UIView,
+            selectionView: UIView
+        ) {
+            // Animate selection lens with spring scale using unified LiquidGlassAnimations
+            LiquidGlassAnimations.highlightScale(
+                layer: selectionView.layer,
+                from: 0.85,
+                to: LiquidGlassAnimationParameters.scaleNormal,
+                parameters: .tabSwitch
+            )
+            
+            // Animate item icons with highlight effect and stretch
+            for view in [itemView, selectedItemView] {
+                // Initial scale up
+                LiquidGlassAnimations.highlightScale(
+                    layer: view.layer,
+                    from: LiquidGlassAnimationParameters.scaleNormal,
+                    to: 1.08,
+                    parameters: .highlightTap
+                ) { [weak view] in
+                    // Bounce back with stretch effect
+                    guard let layer = view?.layer else { return }
+                    LiquidGlassAnimations.stretchScale(
+                        layer: layer,
+                        scaleX: 1.05,
+                        scaleY: 0.95,
+                        parameters: .stretch
+                    ) {
+                        // Return to normal
+                        LiquidGlassAnimations.bounceReleaseScale(
+                            layer: layer,
+                            to: LiquidGlassAnimationParameters.scaleNormal,
+                            parameters: .bounceRelease
+                        )
+                    }
+                }
+            }
+        }
+        
         func update(component: TabBarComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
             let innerInset: CGFloat = 3.0
             
@@ -422,10 +473,8 @@ public final class TabBarComponent: Component {
             let contentHeight = itemSize.height + innerInset * 2.0
             var contentWidth: CGFloat = innerInset
             
-            if self.selectionView.image?.size.height != itemSize.height {
-                self.selectionView.image = generateStretchableFilledCircleImage(radius: itemSize.height * 0.5, color: .white)?.withRenderingMode(.alwaysTemplate)
-            }
-            self.selectionView.tintColor = component.theme.list.itemPrimaryTextColor.withMultipliedAlpha(0.05)
+            // Selection view is now a GlassBackgroundView, no need manually set image
+            // self.selectionView.tintColor is handled via update()
             
             var validIds: [AnyHashable] = []
             var selectionFrame: CGRect?
@@ -505,6 +554,14 @@ public final class TabBarComponent: Component {
                     if let previousComponent, previousComponent.selectedId != item.id, isItemSelected {
                         itemComponentView.playSelectionAnimation()
                         selectedItemComponentView.playSelectionAnimation()
+                        
+                        // MARK: Liquid Glass Tab Switch Animation
+                        // Apply spring bounce animation for liquid glass effect on tab selection
+                        self.animateTabSelection(
+                            itemView: itemComponentView,
+                            selectedItemView: selectedItemComponentView,
+                            selectionView: self.selectionView
+                        )
                     }
                 }
                 if isItemSelected {
@@ -541,8 +598,23 @@ public final class TabBarComponent: Component {
             
             let size = CGSize(width: min(availableSize.width, contentWidth), height: contentHeight)
             
+            // Omit background blur behind the bar itself (enableBlur: false)
+            // while keeping the glass appearance (isDark, tintColor)
             transition.setFrame(view: self.backgroundView, frame: CGRect(origin: CGPoint(), size: size))
-            self.backgroundView.update(size: size, cornerRadius: size.height * 0.5, isDark: component.theme.overallDarkAppearance, tintColor: .init(kind: .panel, color: component.theme.chat.inputPanel.inputBackgroundColor.withMultipliedAlpha(0.7)), transition: transition)
+            self.backgroundView.update(size: size, cornerRadius: size.height * 0.5, isDark: component.theme.overallDarkAppearance, tintColor: .init(kind: .panel, color: component.theme.chat.inputPanel.inputBackgroundColor.withMultipliedAlpha(0.7)), enableBlur: false, transition: transition)
+            
+            // Update selection lens (GlassBackgroundView)
+            if let selectionFrame = selectionFrame {
+                let selectionSize = selectionFrame.size
+                self.selectionView.update(
+                    size: selectionSize,
+                    cornerRadius: selectionSize.height * 0.5,
+                    isDark: component.theme.overallDarkAppearance,
+                    tintColor: .init(kind: .custom, color: component.theme.list.itemPrimaryTextColor.withMultipliedAlpha(0.05)),
+                    enableBlur: true, // Preserve glass lens ability to blur content
+                    transition: transition
+                )
+            }
             
             if self.nativeTabBar != nil {
                 let finalSize = CGSize(width: availableSize.width, height: 62.0)

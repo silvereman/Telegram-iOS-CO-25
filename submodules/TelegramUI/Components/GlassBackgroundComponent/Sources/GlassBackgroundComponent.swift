@@ -292,12 +292,14 @@ public class GlassBackgroundView: UIView {
         public let isDark: Bool
         public let tintColor: TintColor
         public let isInteractive: Bool
+        public let enableBlur: Bool
         
-        init(shape: Shape, isDark: Bool, tintColor: TintColor, isInteractive: Bool) {
+        init(shape: Shape, isDark: Bool, tintColor: TintColor, isInteractive: Bool, enableBlur: Bool) {
             self.shape = shape
             self.isDark = isDark
             self.tintColor = tintColor
             self.isInteractive = isInteractive
+            self.enableBlur = enableBlur
         }
     }
     
@@ -402,11 +404,11 @@ public class GlassBackgroundView: UIView {
         return nil
     }
         
-    public func update(size: CGSize, cornerRadius: CGFloat, isDark: Bool, tintColor: TintColor, isInteractive: Bool = false, transition: ComponentTransition) {
-        self.update(size: size, shape: .roundedRect(cornerRadius: cornerRadius), isDark: isDark, tintColor: tintColor, isInteractive: isInteractive, transition: transition)
+    public func update(size: CGSize, cornerRadius: CGFloat, isDark: Bool, tintColor: TintColor, isInteractive: Bool = false, enableBlur: Bool = true, transition: ComponentTransition) {
+        self.update(size: size, shape: .roundedRect(cornerRadius: cornerRadius), isDark: isDark, tintColor: tintColor, isInteractive: isInteractive, enableBlur: enableBlur, transition: transition)
     }
     
-    public func update(size: CGSize, shape: Shape, isDark: Bool, tintColor: TintColor, isInteractive: Bool = false, transition: ComponentTransition) {
+    public func update(size: CGSize, shape: Shape, isDark: Bool, tintColor: TintColor, isInteractive: Bool = false, enableBlur: Bool = true, transition: ComponentTransition) {
         if let nativeView = self.nativeView, let nativeViewClippingContext = self.nativeViewClippingContext, (nativeView.bounds.size != size || nativeViewClippingContext.shape != shape) {
             
             nativeViewClippingContext.update(shape: shape, size: size, transition: transition)
@@ -425,6 +427,7 @@ public class GlassBackgroundView: UIView {
                 backgroundNode.update(size: size, cornerRadius: cornerRadius, transition: transition.containedViewLayoutTransition)
             }
             transition.setFrame(view: backgroundNode.view, frame: CGRect(origin: CGPoint(), size: size))
+            transition.setAlpha(view: backgroundNode.view, alpha: enableBlur ? 1.0 : 0.0)
         }
         
         let shadowInset: CGFloat = 32.0
@@ -468,7 +471,7 @@ public class GlassBackgroundView: UIView {
             innerBackgroundView.removeFromSuperview()
         }
         
-        let params = Params(shape: shape, isDark: isDark, tintColor: tintColor, isInteractive: isInteractive)
+        let params = Params(shape: shape, isDark: isDark, tintColor: tintColor, isInteractive: isInteractive, enableBlur: enableBlur)
         if self.params != params {
             self.params = params
             

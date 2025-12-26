@@ -76,7 +76,9 @@ public final class GlassButtonNode: HighlightTrackingButtonNode {
     private var labelNode: ImmediateTextNode?
     
     public init(icon: UIImage, label: String?) {
-        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .light))
+        // Enhanced blur view with liquid glass configuration
+        let blurEffect = UIBlurEffect(style: .light)
+        let blurView = UIVisualEffectView(effect: blurEffect)
         blurView.clipsToBounds = true
         blurView.isUserInteractionEnabled = false
         self.blurView = blurView
@@ -114,10 +116,35 @@ public final class GlassButtonNode: HighlightTrackingButtonNode {
         self.iconNode.image = regularImage
         self.currentImage = regularImage
         
+        // Enhanced liquid glass animations
         self.highligthedChanged = { [weak self] highlighted in
-            if let strongSelf = self {
-                strongSelf.internalHighlighted = highlighted
-                strongSelf.updateState(highlighted: highlighted, selected: strongSelf.isSelected)
+            guard let self = self else { return }
+            
+            self.internalHighlighted = highlighted
+            self.updateState(highlighted: highlighted, selected: self.isSelected)
+            
+            // Liquid glass animations
+            if highlighted {
+                // Press down: scale to scalePress constant with spring
+                LiquidGlassAnimations.pressDownScale(
+                    layer: self.layer,
+                    to: LiquidGlassAnimationParameters.scalePress,
+                    parameters: .pressDown
+                )
+            } else {
+                // Bounce release: scale back to scaleNormal constant
+                LiquidGlassAnimations.bounceReleaseScale(
+                    layer: self.layer,
+                    to: LiquidGlassAnimationParameters.scaleNormal,
+                    parameters: .bounceRelease
+                )
+
+                // Add subtle rotation wobble
+                LiquidGlassAnimations.rotationWobble(
+                    layer: self.layer,
+                    angle: 2.0 * .pi / 180.0,
+                    parameters: .bounceRelease
+                )
             }
         }
     }

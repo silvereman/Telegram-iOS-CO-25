@@ -111,6 +111,10 @@ private final class TabBarItemNode: ASDisplayNode {
         }
     }
     
+    // Liquid Glass Layer
+    var glassLayer: TabBarItemGlassLayer?
+    private var isGlassEnabled: Bool = true
+    
     var swiped: ((TabBarItemSwipeDirection) -> Void)?
     
     var pointerInteraction: PointerInteraction?
@@ -187,6 +191,69 @@ private final class TabBarItemNode: ASDisplayNode {
         super.didLoad()
         
         self.pointerInteraction = PointerInteraction(node: self, style: .rectangle(CGSize(width: 90.0, height: 50.0)))
+        
+        // Setup liquid glass layer
+        if isGlassEnabled {
+            setupGlassLayer()
+        }
+    }
+    
+    private func setupGlassLayer() {
+        let isDark = self.view.traitCollection.userInterfaceStyle == .dark
+        let glassLayer = TabBarItemGlassLayer(
+            configuration: .standard,
+            isDark: isDark
+        )
+        
+        // Size the glass layer to be circular around the icon (~45-50pt)
+        let glassSize: CGFloat = 50.0
+        glassLayer.bounds = CGRect(origin: .zero, size: CGSize(width: glassSize, height: glassSize))
+        glassLayer.cornerRadius = glassSize / 2.0
+        
+        self.glassLayer = glassLayer
+        
+        // Add glass layer to the extracted content node
+        if let view = self.extractedContainerNode.contentNode.view {
+            view.addGlassLayer(glassLayer)
+        }
+    }
+    
+    func updateGlassLayerPosition(iconFrame: CGRect) {
+        guard let glassLayer = self.glassLayer else { return }
+        
+        // Center glass layer on icon
+        let glassSize = glassLayer.bounds.size
+        glassLayer.position = CGPoint(
+            x: iconFrame.midX,
+            y: iconFrame.midY
+        )
+    }
+    
+    func animateGlassTap() {
+        guard let glassLayer = self.glassLayer else { return }
+        
+        // Highlight animation
+        glassLayer.animateHighlight()
+        
+        // Return to normal after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak glassLayer] in
+            glassLayer?.resetToNormal()
+        }
+    }
+    
+    func animateGlassPress() {
+        guard let glassLayer = self.glassLayer else { return }
+        glassLayer.animatePress()
+    }
+    
+    func animateGlassRelease() {
+        guard let glassLayer = self.glassLayer else { return }
+        glassLayer.animateRelease()
+    }
+    
+    func animateGlassStretch() {
+        guard let glassLayer = self.glassLayer else { return }
+        glassLayer.animateStretch()
     }
     
     @objc private func swipeGesture(_ gesture: UISwipeGestureRecognizer) {
@@ -362,7 +429,8 @@ class TabBarNode: ASDisplayNode, ASGestureRecognizerDelegate {
         self.swipeAction = swipeAction
         self.theme = theme
 
-        self.backgroundNode = NavigationBackgroundNode(color: theme.rootController.tabBar.backgroundColor)
+        // Disable blur on background - keep solid color only for liquid glass effect
+        self.backgroundNode = NavigationBackgroundNode(color: theme.rootController.tabBar.backgroundColor, enableBlur: false)
         
         self.badgeImage = generateStretchableFilledCircleImage(diameter: 18.0, color: theme.rootController.tabBar.badgeBackgroundColor, strokeColor: theme.rootController.tabBar.badgeStrokeColor, strokeWidth: 1.0, backgroundColor: nil)!
         
@@ -400,15 +468,58 @@ class TabBarNode: ASDisplayNode, ASGestureRecognizerDelegate {
     
     @objc private func tapLongTapOrDoubleTapGesture(_ recognizer: TapLongTapOrDoubleTapGestureRecognizer) {
         switch recognizer.state {
+        case .began:
+            // Animate press on touch down
+            if let location = recognizer.lastRecognizedGestureAndLocation?.1 {
+                if let index = findClosestNodeIndex(at: location) {
+                    let node = self.tabBarNodeContainers[index].imageNode
+                    node.animateGlassPress()
+                }
+            }
         case .ended:
             if let (gesture, location) = recognizer.lastRecognizedGestureAndLocation {
                 if case .tap = gesture {
+                    // Animate release and tap
+                    if let index = findClosestNodeIndex(at: location) {
+                        let node = self.tabBarNodeContainers[index].imageNode
+                        node.animateGlassRelease()
+                        node.animateGlassTap()
+                    }
                     self.tapped(at: location, longTap: false)
                 }
+            }
+        case .cancelled, .failed:
+            // Reset all glass layers on cancel
+            for container in self.tabBarNodeContainers {
+                container.imageNode.glassLayer?.resetToNormal()
             }
         default:
             break
         }
+    }
+    
+    private func findClosestNodeIndex(at location: CGPoint) -> Int? {
+        guard let bottomInset = self.validLayout?.4 else { return nil }
+        if location.y > self.bounds.size.height - bottomInset {
+            return nil
+        }
+        
+        var closestNode: (Int, CGFloat)?
+        for i in 0 ..< self.tabBarNodeContainers.count {
+            let node = self.tabBarNodeContainers[i].imageNode
+            if !node.isUserInteractionEnabled {
+                continue
+            }
+            let distance = abs(location.x - node.position.x)
+            if let previousClosestNode = closestNode {
+                if previousClosestNode.1 > distance {
+                    closestNode = (i, distance)
+                }
+            } else {
+                closestNode = (i, distance)
+            }
+        }
+        return closestNode?.0
     }
     
     func updateTheme(_ theme: PresentationTheme) {
@@ -597,6 +708,11 @@ class TabBarNode: ASDisplayNode, ASGestureRecognizerDelegate {
                         })
                     })
                 }
+                
+                // Animate glass stretch effect on tab change
+                if !self.reduceMotion {
+                    node.animateGlassStretch()
+                }
             } else {
                 let (textImage, contentWidth) = tabBarItemImage(item.item.image, title: item.item.title ?? "", backgroundColor: .clear, tintColor: self.theme.rootController.tabBar.textColor, horizontal: self.horizontal, imageMode: false, centered: self.centered)
                 
@@ -741,6 +857,9 @@ class TabBarNode: ASDisplayNode, ASGestureRecognizerDelegate {
                     node.imageNode.bounds = CGRect(origin: CGPoint(), size: imageFrame.size)
                     node.imageNode.position = imageFrame.center
                 }
+                
+                // Update glass layer position to center on icon
+                node.updateGlassLayerPosition(iconFrame: imageFrame)
                 
                 if container.badgeValue != container.appliedBadgeValue {
                     container.appliedBadgeValue = container.badgeValue
